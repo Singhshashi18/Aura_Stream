@@ -125,9 +125,9 @@ body {
   min-height: 104px;
   padding: 16px 18px 12px;
   border-radius: 50%;
-  border: 1px solid rgba(43, 231, 255, 0.56);
-  background: radial-gradient(circle at 30% 25%, #46f6ff, #0d8ab0 55%, #07526d 100%);
-  color: #03222e;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: radial-gradient(circle at 30% 25%, #2a2a2a, #111111 55%, #000000 100%);
+  color: #ffffff;
   font-weight: 700;
   cursor: pointer;
   display: grid;
@@ -148,7 +148,7 @@ body {
 }
 
 .mic-live {
-  box-shadow: 0 0 28px rgba(55, 248, 255, 0.9), 0 0 58px rgba(181, 89, 255, 0.26);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.18), 0 0 58px rgba(0, 0, 0, 0.45);
 }
 
 .mic-icon {
