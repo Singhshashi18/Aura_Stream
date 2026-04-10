@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-SECRET_KEY = "django-insecure-aura-stream-dev-key"
+SECRET_KEY = os.getenv("SECRET_KEY", "fallback-dev-only")
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 

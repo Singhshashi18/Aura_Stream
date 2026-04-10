@@ -13,7 +13,7 @@ class AuraSession(models.Model):
 
 class ThoughtLog(models.Model):
     session = models.ForeignKey(AuraSession, on_delete=models.CASCADE, related_name="thought_logs")
-    thought_block = models.TextField()
+    user_message = models.TextField()
     final_response = models.TextField()
     interrupted_by = models.TextField(blank=True, default="", help_text="Partial response that was interrupted (if applicable)")
     interruption_type = models.CharField(max_length=32, blank=True, default="", choices=[

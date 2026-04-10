@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import logging
 import math
 import os
 import re
@@ -13,6 +14,9 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from .models import AuraSession, ThoughtLog
+
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_realtime_url(model: str) -> str:
@@ -205,6 +209,20 @@ class CallStreamConsumer(AsyncWebsocketConsumer):
         self.english_only_preference = True
         self.language_retry_pending = False
         self.realtime_blocked = False
+
+        # Emit noisy diagnostics only when explicitly enabled; throttle to avoid client/log spam.
+        self.emit_background_noise_events = os.getenv("EMIT_BACKGROUND_NOISE_EVENTS", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        noise_emit_interval_ms = os.getenv("BACKGROUND_NOISE_EVENT_INTERVAL_MS", "1000").strip()
+        try:
+            self.background_noise_event_interval_sec = max(0.0, float(noise_emit_interval_ms) / 1000.0)
+        except ValueError:
+            self.background_noise_event_interval_sec = 1.0
+        self.last_background_noise_event_at = 0.0
         
         # New: Background noise detection and response resumption
         self.rms_history = []  # Track RMS values for variance analysis (max 10 samples)
@@ -221,13 +239,13 @@ class CallStreamConsumer(AsyncWebsocketConsumer):
         return str(session.uuid)
 
     @database_sync_to_async
-    def _store_thought(self, thought: str, final_response: str, interrupted_by: str = "", interruption_type: str = "not_interrupted") -> None:
+    def _store_thought(self, user_message: str, final_response: str, interrupted_by: str = "", interruption_type: str = "not_interrupted") -> None:
         if not self.session_uuid:
             return
         session = AuraSession.objects.get(uuid=self.session_uuid)
         ThoughtLog.objects.create(
             session=session,
-            thought_block=thought,
+            user_message=user_message,
             final_response=final_response,
             interrupted_by=interrupted_by,
             interruption_type=interruption_type,
@@ -240,7 +258,7 @@ class CallStreamConsumer(AsyncWebsocketConsumer):
         rows = (
             ThoughtLog.objects.filter(session__uuid=self.session_uuid)
             .order_by("-id")
-            .values_list("thought_block", "final_response")[:limit]
+            .values_list("user_message", "final_response")[:limit]
         )
         cleaned = []
         for thought, response in rows:
@@ -530,12 +548,13 @@ class CallStreamConsumer(AsyncWebsocketConsumer):
                 elif event_type == "error":
                     err = event.get("error", {})
                     code = err.get("code", "")
+                    logger.warning("Realtime provider error: %s", json.dumps(event, ensure_ascii=True))
                     await self.send(
                         text_data=json.dumps(
                             {
                                 "event": "error",
                                 "message": err.get("message", event.get("message", "Realtime error")),
-                                "details": event,
+                                "code": code,
                             }
                         )
                     )
@@ -627,8 +646,13 @@ class CallStreamConsumer(AsyncWebsocketConsumer):
                 # Ignore background noise - don't treat it as interruption
                 self.silence_chunks += 1
                 self.speech_interrupt_streak = 0
-                # Don't cancel response for background noise
-                await self.send(text_data=json.dumps({"event": "background_noise_detected"}))
+                # Don't cancel response for background noise.
+                # Optional debug signal is throttled to avoid client/log spam under high packet rates.
+                if self.emit_background_noise_events:
+                    now = time.monotonic()
+                    if (now - self.last_background_noise_event_at) >= self.background_noise_event_interval_sec:
+                        self.last_background_noise_event_at = now
+                        await self.send(text_data=json.dumps({"event": "background_noise_detected"}))
             else:  # silence
                 self.silence_chunks += 1
                 self.speech_interrupt_streak = 0

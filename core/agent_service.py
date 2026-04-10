@@ -199,7 +199,7 @@ def run_agent_turn(session_uuid: str, user_prompt: str) -> dict[str, Any]:
 
         raw = message.get("content") or ""
         thought, final = _split_thinking_block(raw)
-        ThoughtLog.objects.create(session=session, thought_block=thought, final_response=final)
+        ThoughtLog.objects.create(session=session, user_message=user_prompt, final_response=final)
 
         return {
             "ok": True,
