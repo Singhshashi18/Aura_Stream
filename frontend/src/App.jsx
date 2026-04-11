@@ -1,5 +1,39 @@
 import { useRef, useState } from "react";
 
+function buildWebSocketUrl(backendHost) {
+  const envWsUrl = (import.meta.env.VITE_WS_URL || "").trim();
+  const raw = (envWsUrl || backendHost || "").trim();
+  const secure = window.location.protocol === "https:";
+  const scheme = secure ? "wss" : "ws";
+
+  if (!raw) {
+    return `${scheme}://${window.location.host}/ws/call/`;
+  }
+
+  const ensureCallPath = (value) => {
+    const cleaned = value.replace(/\/+$/, "");
+    return /\/ws\/call\/?$/i.test(cleaned) ? cleaned : `${cleaned}/ws/call/`;
+  };
+
+  if (/^wss?:\/\//i.test(raw)) {
+    const normalized = secure ? raw.replace(/^ws:\/\//i, "wss://") : raw.replace(/^wss:\/\//i, "ws://");
+    return ensureCallPath(normalized);
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    const url = new URL(raw);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    if (!/\/ws\/call\/?$/i.test(url.pathname)) {
+      url.pathname = "/ws/call/";
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+
+  return `${scheme}://${raw.replace(/\/+$/, "")}/ws/call/`;
+}
+
 function float32ToInt16(float32Array) {
   const out = new Int16Array(float32Array.length);
   for (let i = 0; i < float32Array.length; i += 1) {
@@ -25,7 +59,7 @@ export default function App() {
   const [prompt, setPrompt] = useState(
     "You are Aura-Stream. Give clear and correct English voice replies. Keep answers concise unless I ask for details."
   );
-  const [backendHost, setBackendHost] = useState("127.0.0.1:8000");
+  const [backendHost, setBackendHost] = useState(import.meta.env.VITE_BACKEND_HOST || "127.0.0.1:8001");
   const [showDebug, setShowDebug] = useState(false);
 
   const wsRef = useRef(null);
@@ -149,7 +183,7 @@ export default function App() {
     stopRequestedRef.current = false;
     setStatus("connecting");
     try {
-      const ws = new WebSocket(`ws://${backendHost}/ws/call/`);
+      const ws = new WebSocket(buildWebSocketUrl(backendHost));
       wsRef.current = ws;
 
       ws.onopen = async () => {
