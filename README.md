@@ -42,7 +42,7 @@ Realtime voice agent stack with Django Channels backend and React frontend.
 
 ## Runtime flow
 
-1. Frontend connects to `ws://127.0.0.1:8001/ws/call/`
+1. Frontend connects to `ws://127.0.0.1:8000/ws/call/`
 2. Audio chunks stream continuously
 3. Backend reports `buffer_update` + VAD stats
 4. On stop, backend runs agent turn with prompt
